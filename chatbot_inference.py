@@ -147,6 +147,54 @@ def extract_reply(prompt: str, decoded: str) -> str:
     return reply or "I am not sure how to answer that. Please rephrase your question."
 
 
+@torch.no_grad()
+def stream_reply(
+    model,
+    enc,
+    device: str,
+    history: list[dict],
+    user_message: str,
+    max_new_tokens: int = 180,
+    temperature: float = 0.45,
+    top_k: int = 25,
+    repetition_penalty: float = 1.15,
+):
+    if is_crisis_message(user_message):
+        yield CRISIS_RESPONSE
+        return
+
+    prompt = build_prompt(history, user_message)
+    start_ids = enc.encode(prompt)
+    start_ids = start_ids[-model.config.block_size :]
+    idx = torch.tensor(start_ids, dtype=torch.long, device=device).unsqueeze(0)
+    emitted = ""
+    sent_len = 0
+
+    for _ in range(max_new_tokens):
+        before = idx.size(1)
+        idx = generate_tokens(
+            model=model,
+            idx=idx,
+            max_new_tokens=1,
+            temperature=temperature,
+            top_k=top_k,
+            repetition_penalty=repetition_penalty,
+        )
+        token_text = enc.decode(idx[0, before:].tolist())
+        emitted += token_text
+
+        for stop_marker in ("\nUser:", "\n\nUser:", "\nAssistant:"):
+            if stop_marker in emitted:
+                visible = emitted.split(stop_marker, 1)[0]
+                chunk = visible[sent_len:]
+                if chunk:
+                    yield chunk
+                return
+
+        yield token_text
+        sent_len = len(emitted)
+
+
 def generate_reply(
     model,
     enc,

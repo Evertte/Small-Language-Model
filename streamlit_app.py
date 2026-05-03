@@ -3,7 +3,7 @@ import os
 
 import streamlit as st
 
-from chatbot_inference import generate_reply, load_chat_model
+from chatbot_inference import load_chat_model, stream_reply
 
 
 DEFAULT_CKPT = Path("models/mental_health_chat/ckpt.pt")
@@ -108,9 +108,9 @@ if prompt:
         st.stop()
 
     with st.chat_message("assistant"):
-        with st.spinner("Generating..."):
-            model, enc, resolved_device = cached_model(str(ckpt), device)
-            reply = generate_reply(
+        model, enc, resolved_device = cached_model(str(ckpt), device)
+        reply = st.write_stream(
+            stream_reply(
                 model=model,
                 enc=enc,
                 device=resolved_device,
@@ -121,6 +121,6 @@ if prompt:
                 top_k=top_k,
                 repetition_penalty=repetition_penalty,
             )
-        st.write(reply)
+        )
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
