@@ -1,0 +1,7 @@
+datasets
+huggingface_hub
+numpy
+streamlit
+tiktoken
+torch
+transformers
